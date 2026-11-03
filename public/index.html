@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Build Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#101722;--panel:#182231;--soft:#202d3e;--border:#304055;--text:#edf3f7;--muted:#9aaabd;--amber:#f2b84b;--teal:#6aa9ff;--red:#df7770;--code:#0c131d;--blue:#6aa9ff}*{box-sizing:border-box}body{margin:0;min-height:100vh;padding:48px 18px 64px;color:var(--text);background:radial-gradient(circle at top right,#1c3045 0,transparent 38%),var(--bg);font-family:'Space Grotesk',sans-serif}.wrap{max-width:760px;margin:auto}.topbar{display:flex;justify-content:space-between;gap:24px;margin-bottom:8px}.eyebrow{color:var(--amber);font:11px 'JetBrains Mono',monospace;letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px}h1{font-size:34px;margin:0 0 8px}p.sub{color:var(--muted);font-size:15px;line-height:1.55;margin:0 0 28px}.nav{display:flex;gap:8px}.nav a{padding:10px 12px;background:var(--soft);border:1px solid var(--border);color:var(--text);font-size:13px;text-decoration:none}.card{background:rgba(24,34,49,.94);border:1px solid var(--border);border-radius:12px;box-shadow:0 18px 42px rgba(0,0,0,.32);padding:24px;margin-bottom:18px}.heading{display:flex;justify-content:space-between;gap:14px;margin-bottom:14px}.heading h2{font-size:16px;margin:0}.heading span{color:var(--muted);font:11px 'JetBrains Mono',monospace}label{display:block;color:var(--muted);font:11.5px 'JetBrains Mono',monospace;margin:12px 0 6px}input,textarea{width:100%;padding:11px 12px;background:var(--code);border:1px solid var(--border);border-radius:7px;color:var(--text);font:13.5px 'JetBrains Mono',monospace}input:focus,textarea:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(106,169,255,.14)}textarea{min-height:110px;resize:vertical}button{margin-top:22px;padding:12px 20px;background:var(--amber);border:0;border-radius:6px;color:#191307;cursor:pointer;font:600 14px 'Space Grotesk',sans-serif}button:disabled{opacity:.5;cursor:default}.step{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font:13px 'JetBrains Mono',monospace}.step:last-child{border-bottom:0}.step .name{color:var(--amber);flex:0 0 130px}.ok .mark{color:var(--teal)}.fail .mark{color:var(--red)}.banner{font:13px 'JetBrains Mono',monospace;padding:10px 12px;border-radius:8px;margin-top:12px}.success{border:1px solid var(--teal);background:rgba(106,169,255,.12)}.failure{border:1px solid var(--red);background:rgba(217,105,95,.12)}pre{margin-top:14px;padding:12px;background:var(--code);border:1px solid var(--border);border-radius:8px;white-space:pre-wrap;overflow:auto;max-height:360px;font:12px/1.5 'JetBrains Mono',monospace}@media(max-width:600px){.topbar{display:block}.nav{margin:18px 0 22px}}
+ .banner a.pr-link{display:inline-flex;align-items:center;margin-top:12px;padding:10px 14px;border:1px solid var(--amber);border-radius:6px;background:var(--amber);color:#191307;font-weight:700;text-decoration:none}.banner a.pr-link:focus-visible{outline:2px solid var(--text);outline-offset:3px}
+.deploy-status{font:12px 'JetBrains Mono',monospace;color:var(--muted);margin:10px 0 0;overflow-wrap:anywhere}
+</style>
+</head>
+<body><main class="wrap"><header class="topbar"><div><div class="eyebrow">Automated delivery workspace</div><h1>Build Agent</h1></div><nav class="nav"><a href="/github.html">GitHub</a><a href="/render.html">Deploy</a></nav></header><p class="sub">Describe a change, review the proposed code, then open a pull request for CI and approval before deployment.</p>
+<section class="card"><div class="heading"><h2>Change request</h2><span>01 / describe</span></div><label for="command">What do you want changed?</label><input id="command" type="text" placeholder="e.g. add a search bar to the invoice list"><label for="customInstructions">Add your own code or instructions (optional)</label><textarea id="customInstructions" placeholder="Paste code, describe exact files, or add requirements for the agent..."></textarea><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button id="run" type="button">Create pull request</button><button id="preview" type="button" style="background:var(--soft);color:var(--text);border:1px solid var(--border);margin-top:22px;">Preview changes</button><button id="deployUpdate" type="button" style="background:var(--soft);color:var(--text);border:1px solid var(--border);margin-top:22px;">Deploy update</button></div><p id="deployStatus" class="deploy-status" role="status" aria-live="polite"></p></section>
+<section class="card" id="result" hidden><div id="steps"></div><div id="banner"></div><div id="previewArea" style="margin-top:16px;display:none"></div></section></main>
+<script>
+const saved=key=>localStorage.getItem(`build-agent.${key}`)||'';const run=document.getElementById('run');const preview=document.getElementById('preview');const result=document.getElementById('result');const steps=document.getElementById('steps');const banner=document.getElementById('banner');const previewArea=document.getElementById('previewArea');const deployUpdate=document.getElementById('deployUpdate');const deployStatus=document.getElementById('deployStatus');
+const getRequestBody=(previewOnly=false)=>{
+  const requested=document.getElementById('command').value.trim();
+  const extra=document.getElementById('customInstructions').value.trim();
+  const command=[requested,extra?`Additional user instructions:\n${extra}`:''].filter(Boolean).join('\n\n');
+  const createNewRepo=localStorage.getItem('build-agent.createNewRepo')==='true';
+  return {repoUrl:saved('repoUrl'),repoName:saved('repoName'),createNewRepo,branch:saved('branch')||undefined,token:saved('token'),deployHookUrl:saved('deployHook')||undefined,deployUrl:saved('deployUrl')||undefined,renderServiceId:saved('renderServiceId')||undefined,command,previewOnly};
+};
+const renderSteps=(data)=>{
+  steps.replaceChildren();
+  for(const step of data.steps||[]){
+    const row=document.createElement('div');
+    row.className=`step ${step.ok?'ok':'fail'}`;
+    const mark=document.createElement('span');
+    mark.className='mark';
+    mark.textContent=step.ok?'●':'x';
+    const name=document.createElement('span');
+    name.className='name';
+    name.textContent=step.issueCategory?`${step.name||'step'} · ${step.issueCategory}${step.retryable?' · repairable':''}`:(step.name||'step');
+    const detail=document.createElement('span');
+    detail.textContent=step.detail||'';
+    row.append(mark,name,detail); steps.appendChild(row);
+  }
+};
+const renderResult=(data, previewMode)=>{
+  const outputText=data.output||data.error||'';
+  banner.className=`banner ${data.ok?'success':'failure'}`;
+  banner.textContent = data.awaitingReview ? 'Pull request opened. Review and merge it, then deploy the update below.' : previewMode ? (data.previewOnly ? 'Preview ready — no branch or pull request was created.' : 'Pipeline result') : (data.ok ? 'Pipeline succeeded.' : 'Pipeline stopped early.');
+  if(outputText){
+    const output=document.createElement('pre');
+    output.textContent=outputText;
+    banner.appendChild(output);
+  }
+  if(data.pullRequest?.url || data.pullRequest?.compareUrl){
+    const link=document.createElement('a');
+    link.href=data.pullRequest.url||data.pullRequest.compareUrl;
+    link.target='_blank';
+    link.rel='noopener noreferrer';
+    link.className='pr-link';
+    link.textContent=data.pullRequest.url?`Review and merge PR #${data.pullRequest.number} to deploy`:`Create pull request for ${data.pullRequest.branch}`;
+    banner.appendChild(link);
+  }
+  if(previewMode && data.files && data.files.length){
+    previewArea.style.display='block';
+    previewArea.innerHTML='';
+    const label=document.createElement('h3');
+    label.textContent='Proposed file changes';
+    previewArea.appendChild(label);
+    for(const file of data.files){
+      const block=document.createElement('div');
+      block.style.border='1px solid var(--border)';
+      block.style.borderRadius='8px';
+      block.style.padding='12px';
+      block.style.marginTop='10px';
+      block.style.background='var(--code)';
+      const pathEl=document.createElement('div');
+      pathEl.style.color='var(--amber)';
+      pathEl.style.font='11px "JetBrains Mono",monospace';
+      pathEl.textContent=file.path;
+      const code=document.createElement('pre');
+      code.textContent=file.content.slice(0, 2800) + (file.content.length>2800 ? '\n...trimmed...' : '');
+      block.append(pathEl, code);
+      previewArea.appendChild(block);
+    }
+    const confirm=document.createElement('button');
+    confirm.type='button';
+    confirm.textContent='Create pull request';
+    confirm.style.marginTop='18px';
+    confirm.onclick=async()=>{
+      const approvedBody=getRequestBody(false);
+      const access=saved('accessKey');
+      const res=await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json',...(access?{'x-access-key':access}:{})},body:JSON.stringify(approvedBody)});
+      const approved=await res.json();
+      renderSteps(approved);
+      renderResult(approved, false);
+    };
+    previewArea.appendChild(confirm);
+  }
+  const environmentVariables=['DATABASE_URL','OPENAI_API_KEY'].filter(key=>`${outputText} ${(data.steps||[]).map(step=>step.detail||'').join(' ')}`.includes(key));
+  if(environmentVariables.length){
+    const help=document.createElement('p');
+    help.textContent=`Set ${environmentVariables.join(' and ')} in the target Render service's Environment settings. Do not paste secret values into the command.`;
+    banner.appendChild(help);
+    if(data.deployUrl){
+      const link=document.createElement('a');
+      link.href=`https://dashboard.render.com/web/${encodeURIComponent(saved('renderServiceId')||'')}/env`;
+      link.target='_blank';
+      link.rel='noopener noreferrer';
+      link.textContent='Open Render Environment settings';
+      banner.appendChild(link);
+    }
+  }
+};
+const runPipeline=async(previewOnly)=>{
+  const body=getRequestBody(previewOnly);
+  if((!body.createNewRepo&&!body.repoUrl)||(body.createNewRepo&&!body.repoName)||!body.token||!body.command){alert(body.createNewRepo?'Repository name, token, and a command are required.':'Repo URL, token, and a command are required.');return}
+  const access=saved('accessKey');
+  run.disabled=true; preview.disabled=true;
+  run.textContent=previewOnly ? 'Previewing...' : 'Creating pull request...';
+  preview.textContent=previewOnly ? 'Previewing...' : 'Preview changes';
+  result.hidden=false; banner.replaceChildren(); previewArea.style.display='none'; previewArea.innerHTML='';
+  steps.textContent='Working - this can take a minute...';
+  try{
+    const response=await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json',...(access?{'x-access-key':access}:{})},body:JSON.stringify(body)});
+    const data=await response.json();
+    renderSteps(data);
+    renderResult(data, previewOnly);
+  }catch(error){
+    banner.className='banner failure';
+    banner.textContent=`Request failed: ${error.message}`;
+  }finally{
+    run.disabled=false; preview.disabled=false;
+    run.textContent='Create pull request';
+    preview.textContent='Preview changes';
+  }
+};
+deployUpdate.addEventListener('click',async()=>{
+  const deployHookUrl=sessionStorage.getItem('build-agent.deployHook')||'';
+  const deployUrl=saved('deployUrl');
+  const repoUrl=saved('repoUrl');
+  const token=saved('token');
+  if(!deployHookUrl){deployStatus.textContent='No deploy hook is available in this tab. Open Deploy settings in this same tab, save the hook, then return and retry.';return}
+  if(!deployUrl||!repoUrl||!token){deployStatus.textContent='Save the live site URL and GitHub repository/token in Deploy and GitHub settings before retrying.';return}
+  deployUpdate.disabled=true;
+  deployStatus.textContent='Finding the latest merged pull request...';
+  try{
+    const access=saved('accessKey');
+    const response=await fetch('/api/deploy/latest-merged',{method:'POST',headers:{'Content-Type':'application/json',...(access?{'x-access-key':access}:{})},body:JSON.stringify({repoUrl,token,deployHookUrl,deployUrl})});
+    const result=await response.json();
+    if(!response.ok||!result.ok) throw new Error(result.error||'Could not start deployment.');
+    sessionStorage.removeItem('build-agent.deployHook');
+    deployStatus.textContent=result.message;
+    deployUpdate.textContent='Deployment started';
+  }catch(error){
+    deployStatus.textContent=error.message;
+    deployUpdate.disabled=false;
+  }
+});
+run.addEventListener('click',()=>runPipeline(false));
+preview.addEventListener('click',()=>runPipeline(true));
+</script></body></html>

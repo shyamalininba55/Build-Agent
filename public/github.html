@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GitHub source | Build Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#101722; --panel:#182231; --border:#304055; --text:#edf3f7; --muted:#9aaabd; --amber:#f2b84b; --blue:#6aa9ff; --code:#0c131d; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; padding:48px 18px; color:var(--text); background:radial-gradient(circle at top right,#1c3045 0,transparent 38%),var(--bg); font-family:'Space Grotesk',sans-serif; }
+  .page { max-width:620px; margin:0 auto; }
+  .back { color:var(--muted); text-decoration:none; font:12px 'JetBrains Mono',monospace; }
+  .eyebrow { margin-top:42px; color:var(--amber); font:11px 'JetBrains Mono',monospace; letter-spacing:.12em; text-transform:uppercase; }
+  h1 { margin:9px 0 8px; font-size:32px; }
+  .intro { color:var(--muted); line-height:1.55; margin:0 0 26px; }
+  .card { padding:24px; border:1px solid var(--border); border-radius:12px; background:rgba(24,34,49,.94); box-shadow:0 18px 42px rgba(0,0,0,.32); }
+  label { display:block; margin:14px 0 6px; color:var(--muted); font:11.5px 'JetBrains Mono',monospace; }
+  input { width:100%; padding:11px 12px; border:1px solid var(--border); border-radius:7px; color:var(--text); background:var(--code); font:13px 'JetBrains Mono',monospace; }
+  input:focus { outline:none; border-color:var(--blue); box-shadow:0 0 0 3px rgba(106,169,255,.14); }
+  .check { display:flex; gap:8px; align-items:center; color:var(--text); font:13px 'Space Grotesk',sans-serif; }
+  .check input { width:auto; }
+  button { margin-top:22px; padding:12px 18px; border:0; border-radius:7px; background:var(--amber); color:#191307; font:600 14px 'Space Grotesk',sans-serif; cursor:pointer; }
+  #status { display:inline-block; margin-left:12px; color:var(--blue); font:12px 'JetBrains Mono',monospace; }
+</style>
+</head>
+<body>
+<main class="page">
+  <a class="back" href="/">← Back to change request</a>
+  <div class="eyebrow">02 / connect</div>
+  <h1>GitHub source</h1>
+  <p class="intro">Choose the repository and base branch. The agent pushes to a new branch and opens a pull request for review.</p>
+  <form class="card" id="githubForm">
+    <label for="accessKey">Access key (only if configured)</label>
+    <input id="accessKey" type="password" placeholder="leave blank for local use">
+    <label for="repoUrl">Repository URL</label>
+    <input id="repoUrl" type="text" placeholder="https://github.com/owner/repo">
+    <label for="branch">Branch</label>
+    <input id="branch" type="text" placeholder="main">
+    <label class="check"><input id="createNewRepo" type="checkbox"> Create a new public GitHub repository</label>
+    <div id="newRepoFields" hidden>
+      <label for="repoName">New repository name</label>
+      <input id="repoName" type="text" placeholder="my-new-app">
+    </div>
+    <label for="token">GitHub token</label>
+    <input id="token" type="password" placeholder="github_pat_...">
+    <p class="intro">For existing repositories, grant Contents: Read and write, Pull requests: Read and write, Actions: Read and write, and Secrets: Read and write for this repository. Creating a repository also requires permission to create repositories.</p>
+    <button type="submit">Save GitHub settings</button><span id="status"></span>
+  </form>
+</main>
+<script>
+const keys = ['accessKey', 'repoUrl', 'branch', 'repoName', 'token'];
+keys.forEach((key) => { document.getElementById(key).value = localStorage.getItem(`build-agent.${key}`) || ''; });
+const createNewRepo = document.getElementById('createNewRepo');
+createNewRepo.checked = localStorage.getItem('build-agent.createNewRepo') === 'true';
+document.getElementById('newRepoFields').hidden = !createNewRepo.checked;
+createNewRepo.addEventListener('change', () => { document.getElementById('newRepoFields').hidden = !createNewRepo.checked; });
+document.getElementById('githubForm').addEventListener('submit', (event) => {
+  event.preventDefault();
+  keys.forEach((key) => localStorage.setItem(`build-agent.${key}`, document.getElementById(key).value.trim()));
+  localStorage.setItem('build-agent.createNewRepo', String(createNewRepo.checked));
+  document.getElementById('status').textContent = 'Saved';
+});
+</script>
+</body>
+</html>
