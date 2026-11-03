@@ -1,0 +1,23 @@
+{
+  "name": "build-agent-app",
+  "version": "1.0.0",
+  "description": "PR-gated delivery pipeline: an agent edits a repository, validates changes, opens a pull request, and deploys after approval and merge.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "download:model": "node scripts/download-local-model.js",
+    "build": "node --check server.js && node --check lib/agent.js && node --check lib/local-model.js && node --check lib/build.js && node --check lib/deploy.js && node --check lib/github.js && node --check lib/issues.js && node --check lib/pipeline.js && node --check lib/render.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.128.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "libsodium-wrappers": "^0.8.4",
+    "simple-git": "^3.25.0"
+  }
+}
